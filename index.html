@@ -77,6 +77,15 @@ select, textarea { width: 100%; padding: 12px; border: 1.5px solid #d8dbe4; bord
 textarea { min-height: 110px; resize: vertical; }
 
 .spinner { text-align: center; padding: 30px; color: var(--muted); }
+
+/* 振り返り */
+#reviewBox { text-align: left; }
+.reviewItem { border: 1px solid #eee; border-left: 4px solid var(--red); border-radius: 10px; padding: 12px 14px; margin-top: 10px; background: #fff; }
+.reviewItem .rq { font-weight: 700; font-size: 14px; }
+.reviewItem .ra { color: var(--green); font-size: 13px; font-weight: 700; margin-top: 5px; }
+.reviewItem .rw { color: var(--red); font-size: 13px; margin-top: 2px; }
+.reviewItem .rexp { font-size: 13px; color: #555; margin-top: 5px; }
+.reviewTitle { font-weight: 800; font-size: 15px; margin-top: 18px; }
 footer { text-align: center; font-size: 11px; color: #aaa; padding: 14px; }
 </style>
 </head>
@@ -135,6 +144,7 @@ footer { text-align: center; font-size: 11px; color: #aaa; padding: 14px; }
           <p class="muted">今日の正解数</p>
           <p class="streak" id="doneStreak"></p>
           <p class="muted" style="margin-top:12px;">間違えた問題は、数日後にまた出題されます。<br>おつかれさまでした！</p>
+          <div id="reviewBox"></div>
         </div>
       </section>
 
@@ -337,6 +347,31 @@ function showDone(correct, total, streak) {
   hide('quizPlay'); hide('quizHome'); hide('quizLoading'); show('quizDone');
   document.getElementById('doneScore').textContent = correct + ' / ' + total;
   document.getElementById('doneStreak').textContent = streak > 0 ? '🔥 連続 ' + streak + ' 日実施中！' : '';
+  loadReview();
+}
+
+function loadReview() {
+  const box = document.getElementById('reviewBox');
+  box.innerHTML = '<div class="spinner">振り返りを読み込み中…</div>';
+  api({ action: 'review', name: me }).then(res => {
+    if (res.error || !res.items) { box.innerHTML = ''; return; }
+    const wrong = res.items.filter(x => !x.correct);
+    if (wrong.length === 0) {
+      box.innerHTML = '<p class="muted" style="text-align:center;margin-top:14px;">🎉 全問正解！今日の復習はありません。</p>';
+      return;
+    }
+    box.innerHTML =
+      '<p class="reviewTitle">📖 今日の振り返り（間違えた ' + wrong.length + ' 問）</p>' +
+      wrong.map(x =>
+        '<div class="reviewItem">' +
+        '<p class="rq">' + escHtml(x.q) + '</p>' +
+        '<p class="ra">⭕ 正解：' + escHtml(x.answer) + '</p>' +
+        (x.your ? '<p class="rw">❌ あなたの回答：' + escHtml(x.your) + '</p>' : '') +
+        '<p class="rexp">' + escHtml(x.exp) + '</p>' +
+        '<a class="srcLink" href="' + x.url + '" target="_blank" rel="noopener">📖 Notionでルールを読む（' + escHtml(x.src) + '）→</a>' +
+        '</div>'
+      ).join('');
+  }).catch(() => { box.innerHTML = ''; });
 }
 
 // ===== 検索 =====
