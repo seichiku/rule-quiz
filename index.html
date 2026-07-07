@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex, nofollow">
+<title>ルールクイズ｜成竹グループ</title>
+<style>
+:root {
+  --blue: #04137D;
+  --blue-light: #e8ebf7;
+  --green: #0a8a4e;
+  --green-bg: #e6f6ee;
+  --red: #c0392b;
+  --red-bg: #fdecea;
+  --gray: #f5f6f8;
+  --text: #222;
+  --muted: #777;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body { font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Noto Sans JP", sans-serif; background: var(--gray); color: var(--text); font-size: 16px; line-height: 1.6; }
+.wrap { max-width: 560px; margin: 0 auto; min-height: 100vh; display: flex; flex-direction: column; }
+
+header { background: var(--blue); color: #fff; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; }
+header h1 { font-size: 17px; font-weight: 700; }
+#userBadge { font-size: 13px; background: rgba(255,255,255,.15); border: none; color: #fff; padding: 5px 12px; border-radius: 20px; cursor: pointer; }
+
+nav { display: flex; background: #fff; border-bottom: 1px solid #e3e5ea; position: sticky; top: 0; z-index: 5; }
+nav button { flex: 1; padding: 13px 0; border: none; background: none; font-size: 15px; font-weight: 600; color: var(--muted); cursor: pointer; border-bottom: 3px solid transparent; }
+nav button.active { color: var(--blue); border-bottom-color: var(--blue); }
+
+main { flex: 1; padding: 16px; }
+.card { background: #fff; border-radius: 14px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.06); margin-bottom: 14px; }
+.hidden { display: none !important; }
+.center { text-align: center; }
+.muted { color: var(--muted); font-size: 13px; }
+.btn { display: block; width: 100%; padding: 14px; border: none; border-radius: 12px; background: var(--blue); color: #fff; font-size: 16px; font-weight: 700; cursor: pointer; }
+.btn:disabled { opacity: .5; }
+.btn.sub { background: #fff; color: var(--blue); border: 2px solid var(--blue); }
+
+/* 名前選択 */
+#nameList { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+#nameList button { padding: 14px 6px; border: 1.5px solid #d8dbe4; border-radius: 12px; background: #fff; font-size: 15px; font-weight: 600; cursor: pointer; }
+.clinicLabel { grid-column: 1 / -1; font-size: 13px; font-weight: 700; color: var(--blue); margin-top: 8px; }
+
+/* クイズ */
+.progressBar { height: 8px; background: #e3e5ea; border-radius: 4px; overflow: hidden; margin: 10px 0 4px; }
+.progressBar > div { height: 100%; background: var(--blue); border-radius: 4px; transition: width .3s; }
+.qCat { display: inline-block; background: var(--blue-light); color: var(--blue); font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 12px; margin-bottom: 10px; }
+.qText { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+.choices button { display: block; width: 100%; text-align: left; padding: 13px 14px; margin-bottom: 10px; border: 1.5px solid #d8dbe4; border-radius: 12px; background: #fff; font-size: 15px; cursor: pointer; line-height: 1.5; }
+.choices button.correct { border-color: var(--green); background: var(--green-bg); font-weight: 700; }
+.choices button.wrong { border-color: var(--red); background: var(--red-bg); }
+.choices button:disabled { cursor: default; opacity: .85; }
+.resultBox { border-radius: 12px; padding: 14px; margin-top: 6px; }
+.resultBox.ok { background: var(--green-bg); }
+.resultBox.ng { background: var(--red-bg); }
+.resultBox .mark { font-size: 18px; font-weight: 800; }
+.resultBox.ok .mark { color: var(--green); }
+.resultBox.ng .mark { color: var(--red); }
+.resultBox .exp { font-size: 14px; margin-top: 6px; }
+.srcLink { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--blue); font-weight: 700; text-decoration: none; }
+.bigNum { font-size: 42px; font-weight: 800; color: var(--blue); }
+.streak { font-size: 15px; margin-top: 6px; }
+
+/* 検索 */
+.searchRow { display: flex; gap: 8px; }
+.searchRow input { flex: 1; padding: 12px 14px; border: 1.5px solid #d8dbe4; border-radius: 12px; font-size: 16px; }
+.searchRow button { padding: 12px 18px; border: none; border-radius: 12px; background: var(--blue); color: #fff; font-weight: 700; font-size: 15px; cursor: pointer; }
+.sResult { border-bottom: 1px solid #eee; padding: 12px 2px; }
+.sResult:last-child { border-bottom: none; }
+.sResult a { color: var(--blue); font-weight: 700; text-decoration: none; font-size: 15px; }
+.sResult p { font-size: 13px; color: #555; margin-top: 3px; }
+
+/* 報告 */
+select, textarea { width: 100%; padding: 12px; border: 1.5px solid #d8dbe4; border-radius: 12px; font-size: 15px; font-family: inherit; margin-bottom: 12px; background: #fff; }
+textarea { min-height: 110px; resize: vertical; }
+
+.spinner { text-align: center; padding: 30px; color: var(--muted); }
+footer { text-align: center; font-size: 11px; color: #aaa; padding: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>📘 ルールクイズ</h1>
+    <button id="userBadge" class="hidden" onclick="changeUser()"></button>
+  </header>
+
+  <!-- 名前選択 -->
+  <div id="viewName" class="hidden">
+    <main>
+      <div class="card">
+        <p style="font-weight:700;font-size:17px;">あなたの名前を選んでください</p>
+        <p class="muted">最初の1回だけです（この端末に記憶されます）</p>
+        <div id="nameList"></div>
+      </div>
+    </main>
+  </div>
+
+  <!-- メイン -->
+  <div id="viewMain" class="hidden" style="display:flex;flex-direction:column;flex:1;">
+    <nav>
+      <button id="tabQuiz" class="active" onclick="showTab('quiz')">✏️ 今日のクイズ</button>
+      <button id="tabSearch" onclick="showTab('search')">🔍 ルール検索</button>
+      <button id="tabFb" onclick="showTab('fb')">📣 報告</button>
+    </nav>
+    <main>
+      <!-- クイズ -->
+      <section id="paneQuiz">
+        <div id="quizLoading" class="spinner">読み込み中…</div>
+        <div id="quizHome" class="card center hidden">
+          <p style="font-size:15px;font-weight:700;" id="quizHomeMsg"></p>
+          <div class="progressBar"><div id="homeProg" style="width:0%"></div></div>
+          <p class="muted" id="homeProgText"></p>
+          <div style="margin-top:16px;">
+            <button class="btn" id="startBtn" onclick="startQuiz()">クイズをはじめる</button>
+          </div>
+          <p class="streak" id="homeStreak"></p>
+        </div>
+        <div id="quizPlay" class="hidden">
+          <div class="card">
+            <div class="muted" id="qCounter"></div>
+            <div class="progressBar"><div id="qProg" style="width:0%"></div></div>
+            <span class="qCat" id="qCat"></span>
+            <p class="qText" id="qText"></p>
+            <div class="choices" id="qChoices"></div>
+            <div id="qResult" class="hidden"></div>
+            <button class="btn hidden" id="nextBtn" onclick="nextQuestion()" style="margin-top:14px;">次の問題へ</button>
+          </div>
+        </div>
+        <div id="quizDone" class="card center hidden">
+          <p style="font-size:17px;font-weight:800;">🎉 本日分クリア！</p>
+          <p class="bigNum" id="doneScore"></p>
+          <p class="muted">今日の正解数</p>
+          <p class="streak" id="doneStreak"></p>
+          <p class="muted" style="margin-top:12px;">間違えた問題は、数日後にまた出題されます。<br>おつかれさまでした！</p>
+        </div>
+      </section>
+
+      <!-- 検索 -->
+      <section id="paneSearch" class="hidden">
+        <div class="card">
+          <p style="font-weight:700;margin-bottom:10px;">ルールを検索</p>
+          <div class="searchRow">
+            <input type="search" id="searchInput" placeholder="例：爪 / 両替 / 回数券 / クレーム" onkeydown="if(event.key==='Enter')doSearch()">
+            <button onclick="doSearch()">検索</button>
+          </div>
+          <p class="muted" style="margin-top:8px;">キーワードでルールブックの該当箇所を探せます。詳細はNotionの正本ページへ。</p>
+        </div>
+        <div class="card hidden" id="searchResults"></div>
+      </section>
+
+      <!-- 報告 -->
+      <section id="paneFb" class="hidden">
+        <div class="card">
+          <p style="font-weight:700;margin-bottom:4px;">ルール・クイズについて報告</p>
+          <p class="muted" style="margin-bottom:12px;">「分かりにくい」「現場と違う」は改善のチャンスです。どんどん送ってください（竹中さんに直接届きます）。</p>
+          <select id="fbType">
+            <option>ルールが分かりにくい</option>
+            <option>ルールと現場の実態が違う</option>
+            <option>クイズの問題・解説がおかしい</option>
+            <option>こういうルール・クイズがほしい</option>
+            <option>その他</option>
+          </select>
+          <textarea id="fbText" placeholder="例：「②店舗ルール１８・お金」の両替の内訳が今の運用と違います。実際は…"></textarea>
+          <button class="btn" id="fbBtn" onclick="sendFb()">送信する</button>
+          <p class="muted hidden center" id="fbDone" style="margin-top:10px;font-weight:700;color:var(--green);">送信しました。ありがとうございます！</p>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <footer>成竹グループ｜ルールの正本はNotion【スタッフ共有】です</footer>
+</div>
+
+<script>
+// ★デプロイ後にGASのWebアプリURL（/exec）に置き換わります
+const API = 'https://script.google.com/macros/s/AKfycbwcEO2b4RnKRXnvhnZ9BkkIMyPeDMv2zgivIuemFIvNlIeDT1jCzeFcwPVmV6WCcPiF/exec';
+
+let me = localStorage.getItem('rq_name') || '';
+let quiz = null;      // {questions:[...]}
+let qIndex = 0;
+let correctCount = 0;
+
+function api(params) {
+  const qs = Object.keys(params).map(k => k + '=' + encodeURIComponent(params[k])).join('&');
+  return fetch(API + '?' + qs).then(r => r.json());
+}
+
+function init() {
+  if (!me) { showNamePicker(); return; }
+  document.getElementById('viewMain').classList.remove('hidden');
+  document.getElementById('userBadge').classList.remove('hidden');
+  document.getElementById('userBadge').textContent = me + ' ▾';
+  loadQuizHome();
+}
+
+function showNamePicker() {
+  document.getElementById('viewName').classList.remove('hidden');
+  document.getElementById('viewMain').classList.add('hidden');
+  api({ action: 'init' }).then(res => {
+    if (res.error) { alert(res.error); return; }
+    const byClinic = {};
+    res.staff.forEach(s => { (byClinic[s.clinic] = byClinic[s.clinic] || []).push(s); });
+    const box = document.getElementById('nameList');
+    box.innerHTML = '';
+    Object.keys(byClinic).forEach(clinic => {
+      const label = document.createElement('div');
+      label.className = 'clinicLabel'; label.textContent = clinic;
+      box.appendChild(label);
+      byClinic[clinic].forEach(s => {
+        const b = document.createElement('button');
+        b.textContent = s.name;
+        b.onclick = () => {
+          me = s.name;
+          localStorage.setItem('rq_name', me);
+          document.getElementById('viewName').classList.add('hidden');
+          init();
+        };
+        box.appendChild(b);
+      });
+    });
+  }).catch(() => alert('通信エラー。電波の良い場所でお試しください。'));
+}
+
+function changeUser() {
+  if (confirm('名前を選び直しますか？')) {
+    localStorage.removeItem('rq_name');
+    location.reload();
+  }
+}
+
+function showTab(t) {
+  ['quiz', 'search', 'fb'].forEach(x => {
+    document.getElementById('pane' + cap(x)).classList.toggle('hidden', x !== t);
+    document.getElementById('tab' + cap(x)).classList.toggle('active', x === t);
+  });
+}
+function cap(s) { return s === 'fb' ? 'Fb' : s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ===== クイズ =====
+function loadQuizHome() {
+  show('quizLoading'); hide('quizHome'); hide('quizPlay'); hide('quizDone');
+  api({ action: 'status', name: me }).then(st => {
+    hide('quizLoading');
+    if (st.error) { document.getElementById('quizLoading').textContent = st.error; show('quizLoading'); return; }
+    if (st.completed) {
+      showDone(st.correctToday, st.total, st.streak);
+      return;
+    }
+    show('quizHome');
+    const pct = Math.round(st.doneToday / st.total * 100);
+    document.getElementById('quizHomeMsg').textContent =
+      st.doneToday === 0 ? '今日の' + st.total + '問に挑戦しましょう！' : '続きから再開できます';
+    document.getElementById('homeProg').style.width = pct + '%';
+    document.getElementById('homeProgText').textContent = st.doneToday + ' / ' + st.total + ' 問';
+    document.getElementById('homeStreak').textContent = st.streak > 0 ? '🔥 連続 ' + st.streak + ' 日実施中' : '';
+    document.getElementById('startBtn').textContent = st.doneToday === 0 ? 'クイズをはじめる' : '続きから再開する';
+  }).catch(() => { document.getElementById('quizLoading').textContent = '通信エラー。再読み込みしてください。'; });
+}
+
+function startQuiz() {
+  const btn = document.getElementById('startBtn');
+  btn.disabled = true; btn.textContent = '読み込み中…';
+  api({ action: 'quiz', name: me }).then(res => {
+    btn.disabled = false;
+    if (res.error) { alert(res.error); return; }
+    quiz = res;
+    correctCount = quiz.questions.filter(q => q.done && q.done.correct).length;
+    qIndex = quiz.questions.findIndex(q => !q.done);
+    if (qIndex === -1) { loadQuizHome(); return; }
+    hide('quizHome'); show('quizPlay');
+    renderQuestion();
+  }).catch(() => { btn.disabled = false; alert('通信エラー'); });
+}
+
+function renderQuestion() {
+  const q = quiz.questions[qIndex];
+  const doneCount = quiz.questions.filter(x => x.done).length;
+  document.getElementById('qCounter').textContent = '第 ' + (doneCount + 1) + ' 問 / 全 ' + quiz.questions.length + ' 問';
+  document.getElementById('qProg').style.width = Math.round(doneCount / quiz.questions.length * 100) + '%';
+  document.getElementById('qCat').textContent = q.cat;
+  document.getElementById('qText').textContent = q.q;
+  const box = document.getElementById('qChoices');
+  box.innerHTML = '';
+  q.c.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.textContent = (i + 1) + '. ' + c;
+    b.onclick = () => answer(i + 1, b);
+    box.appendChild(b);
+  });
+  hide('qResult'); hide('nextBtn');
+}
+
+function answer(choice, btnEl) {
+  const q = quiz.questions[qIndex];
+  Array.from(document.getElementById('qChoices').children).forEach(b => b.disabled = true);
+  btnEl.textContent += '　⏳';
+  api({ action: 'answer', name: me, qid: q.id, choice: choice }).then(res => {
+    if (res.error) { alert(res.error); return; }
+    const buttons = document.getElementById('qChoices').children;
+    btnEl.textContent = btnEl.textContent.replace('　⏳', '');
+    buttons[res.answer - 1].classList.add('correct');
+    if (!res.correct) btnEl.classList.add('wrong');
+    else correctCount++;
+    q.done = { choice: choice, correct: res.correct };
+
+    const r = document.getElementById('qResult');
+    r.className = 'resultBox ' + (res.correct ? 'ok' : 'ng');
+    r.innerHTML =
+      '<span class="mark">' + (res.correct ? '⭕ 正解！' : '❌ 不正解') + '</span>' +
+      '<p class="exp">' + escHtml(res.explanation) + '</p>' +
+      '<span class="muted">出典：' + escHtml(res.source) + '</span><br>' +
+      '<a class="srcLink" href="' + res.url + '" target="_blank" rel="noopener">📖 Notionでルールを読む →</a>';
+    show('qResult');
+    document.getElementById('nextBtn').textContent =
+      quiz.questions.filter(x => !x.done).length > 0 ? '次の問題へ' : '結果を見る';
+    show('nextBtn');
+  }).catch(() => {
+    alert('通信エラー。もう一度タップしてください。');
+    Array.from(document.getElementById('qChoices').children).forEach(b => b.disabled = false);
+    btnEl.textContent = btnEl.textContent.replace('　⏳', '');
+  });
+}
+
+function nextQuestion() {
+  qIndex = quiz.questions.findIndex(q => !q.done);
+  if (qIndex === -1) {
+    api({ action: 'status', name: me }).then(st => showDone(correctCount, quiz.questions.length, st.streak || 0));
+    return;
+  }
+  renderQuestion();
+}
+
+function showDone(correct, total, streak) {
+  hide('quizPlay'); hide('quizHome'); hide('quizLoading'); show('quizDone');
+  document.getElementById('doneScore').textContent = correct + ' / ' + total;
+  document.getElementById('doneStreak').textContent = streak > 0 ? '🔥 連続 ' + streak + ' 日実施中！' : '';
+}
+
+// ===== 検索 =====
+function doSearch() {
+  const q = document.getElementById('searchInput').value.trim();
+  if (!q) return;
+  const box = document.getElementById('searchResults');
+  box.classList.remove('hidden');
+  box.innerHTML = '<div class="spinner">検索中…</div>';
+  api({ action: 'search', q: q }).then(res => {
+    if (!res.results || res.results.length === 0) {
+      box.innerHTML = '<p class="muted">「' + escHtml(q) + '」に一致するルールが見つかりませんでした。別の言葉で試すか、📣報告タブで「こういうルールがほしい」と送ってください。</p>';
+      return;
+    }
+    box.innerHTML = res.results.map(r =>
+      '<div class="sResult"><a href="' + r.url + '" target="_blank" rel="noopener">' + escHtml(r.title) + ' →</a>' +
+      '<p>' + escHtml(r.snippet) + '</p></div>'
+    ).join('');
+  }).catch(() => { box.innerHTML = '<p class="muted">通信エラー</p>'; });
+}
+
+// ===== 報告 =====
+function sendFb() {
+  const text = document.getElementById('fbText').value.trim();
+  const type = document.getElementById('fbType').value;
+  if (!text) { alert('内容を入力してください'); return; }
+  const btn = document.getElementById('fbBtn');
+  btn.disabled = true; btn.textContent = '送信中…';
+  api({ action: 'feedback', name: me, type: type, target: '', text: text }).then(res => {
+    btn.disabled = false; btn.textContent = '送信する';
+    if (res.error) { alert(res.error); return; }
+    document.getElementById('fbText').value = '';
+    show('fbDone');
+    setTimeout(() => hide('fbDone'), 4000);
+  }).catch(() => { btn.disabled = false; btn.textContent = '送信する'; alert('通信エラー'); });
+}
+
+function show(id) { document.getElementById(id).classList.remove('hidden'); }
+function hide(id) { document.getElementById(id).classList.add('hidden'); }
+function escHtml(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+init();
+</script>
+</body>
+</html>
