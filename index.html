@@ -306,32 +306,29 @@ function renderQuestion() {
 function answer(choice, btnEl) {
   const q = quiz.questions[qIndex];
   Array.from(document.getElementById('qChoices').children).forEach(b => b.disabled = true);
-  btnEl.textContent += '　⏳';
-  api({ action: 'answer', name: me, qid: q.id, choice: choice }).then(res => {
-    if (res.error) { alert(res.error); return; }
-    const buttons = document.getElementById('qChoices').children;
-    btnEl.textContent = btnEl.textContent.replace('　⏳', '');
-    buttons[res.answer - 1].classList.add('correct');
-    if (!res.correct) btnEl.classList.add('wrong');
-    else correctCount++;
-    q.done = { choice: choice, correct: res.correct };
 
-    const r = document.getElementById('qResult');
-    r.className = 'resultBox ' + (res.correct ? 'ok' : 'ng');
-    r.innerHTML =
-      '<span class="mark">' + (res.correct ? '⭕ 正解！' : '❌ 不正解') + '</span>' +
-      '<p class="exp">' + escHtml(res.explanation) + '</p>' +
-      '<span class="muted">出典：' + escHtml(res.source) + '</span><br>' +
-      '<a class="srcLink" href="' + res.url + '" target="_blank" rel="noopener">📖 Notionでルールを読む →</a>';
-    show('qResult');
-    document.getElementById('nextBtn').textContent =
-      quiz.questions.filter(x => !x.done).length > 0 ? '次の問題へ' : '結果を見る';
-    show('nextBtn');
-  }).catch(() => {
-    alert('通信エラー。もう一度タップしてください。');
-    Array.from(document.getElementById('qChoices').children).forEach(b => b.disabled = false);
-    btnEl.textContent = btnEl.textContent.replace('　⏳', '');
-  });
+  // 採点はブラウザ側で即時に行う（通信待ちなし）
+  const correct = (choice === q.a);
+  const buttons = document.getElementById('qChoices').children;
+  buttons[q.a - 1].classList.add('correct');
+  if (!correct) btnEl.classList.add('wrong');
+  else correctCount++;
+  q.done = { choice: choice, correct: correct };
+
+  const r = document.getElementById('qResult');
+  r.className = 'resultBox ' + (correct ? 'ok' : 'ng');
+  r.innerHTML =
+    '<span class="mark">' + (correct ? '⭕ 正解！' : '❌ 不正解') + '</span>' +
+    '<p class="exp">' + escHtml(q.exp) + '</p>' +
+    '<span class="muted">出典：' + escHtml(q.src) + '</span><br>' +
+    '<a class="srcLink" href="' + q.url + '" target="_blank" rel="noopener">📖 Notionでルールを読む →</a>';
+  show('qResult');
+  document.getElementById('nextBtn').textContent =
+    quiz.questions.filter(x => !x.done).length > 0 ? '次の問題へ' : '結果を見る';
+  show('nextBtn');
+
+  // 記録はバックグラウンドで送信（画面はいっさい待たせない）
+  api({ action: 'answer', name: me, qid: q.id, choice: choice }).catch(() => {});
 }
 
 function nextQuestion() {
@@ -352,26 +349,39 @@ function showDone(correct, total, streak) {
 
 function loadReview() {
   const box = document.getElementById('reviewBox');
+  // 今日その場で解いた場合は手元のデータで即表示（通信なし）
+  if (quiz && quiz.questions) {
+    const wrong = quiz.questions.filter(x => x.done && !x.done.correct);
+    renderReview(box, wrong.map(x => ({
+      q: x.q, answer: x.c[x.a - 1], your: x.c[x.done.choice - 1] || '',
+      exp: x.exp, src: x.src, url: x.url,
+    })));
+    return;
+  }
+  // 既に完了済みで開き直した場合のみサーバーから取得
   box.innerHTML = '<div class="spinner">振り返りを読み込み中…</div>';
   api({ action: 'review', name: me }).then(res => {
     if (res.error || !res.items) { box.innerHTML = ''; return; }
-    const wrong = res.items.filter(x => !x.correct);
-    if (wrong.length === 0) {
-      box.innerHTML = '<p class="muted" style="text-align:center;margin-top:14px;">🎉 全問正解！今日の復習はありません。</p>';
-      return;
-    }
-    box.innerHTML =
-      '<p class="reviewTitle">📖 今日の振り返り（間違えた ' + wrong.length + ' 問）</p>' +
-      wrong.map(x =>
-        '<div class="reviewItem">' +
-        '<p class="rq">' + escHtml(x.q) + '</p>' +
-        '<p class="ra">⭕ 正解：' + escHtml(x.answer) + '</p>' +
-        (x.your ? '<p class="rw">❌ あなたの回答：' + escHtml(x.your) + '</p>' : '') +
-        '<p class="rexp">' + escHtml(x.exp) + '</p>' +
-        '<a class="srcLink" href="' + x.url + '" target="_blank" rel="noopener">📖 Notionでルールを読む（' + escHtml(x.src) + '）→</a>' +
-        '</div>'
-      ).join('');
+    renderReview(box, res.items.filter(x => !x.correct));
   }).catch(() => { box.innerHTML = ''; });
+}
+
+function renderReview(box, wrong) {
+  if (wrong.length === 0) {
+    box.innerHTML = '<p class="muted" style="text-align:center;margin-top:14px;">🎉 全問正解！今日の復習はありません。</p>';
+    return;
+  }
+  box.innerHTML =
+    '<p class="reviewTitle">📖 今日の振り返り（間違えた ' + wrong.length + ' 問）</p>' +
+    wrong.map(x =>
+      '<div class="reviewItem">' +
+      '<p class="rq">' + escHtml(x.q) + '</p>' +
+      '<p class="ra">⭕ 正解：' + escHtml(x.answer) + '</p>' +
+      (x.your ? '<p class="rw">❌ あなたの回答：' + escHtml(x.your) + '</p>' : '') +
+      '<p class="rexp">' + escHtml(x.exp) + '</p>' +
+      '<a class="srcLink" href="' + x.url + '" target="_blank" rel="noopener">📖 Notionでルールを読む（' + escHtml(x.src) + '）→</a>' +
+      '</div>'
+    ).join('');
 }
 
 // ===== 検索 =====
