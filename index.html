@@ -207,11 +207,61 @@ function api(params) {
   return fetch(API + '?' + qs).then(r => r.json());
 }
 
+// ===== 回答送信キュー（2026-07-24：回答欠落バグ対策） =====
+// 従来は回答ごとに送りっぱなし（失敗を握りつぶし）だったため、同時アクセス時に
+// サーバのロック渋滞で回答が消えることがあった。以下の3段構えに変更：
+//  1) 逐次送信（1件ずつ・前の送信の完了を待つ）＋失敗時は3秒後にリトライ
+//  2) 未送信分はlocalStorageに退避（ページを閉じても翌回に再送）
+//  3) 完了画面で全回答をanswerBatchで照合送信（サーバ側で二重記録は防止）
+let sendQueue = [];
+let sending = false;
+
+function localToday() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+function loadSendQueue() {
+  try {
+    const raw = localStorage.getItem('rq_sendq');
+    if (!raw) return;
+    const obj = JSON.parse(raw);
+    if (obj.name === me && obj.date === localToday() && Array.isArray(obj.items)) {
+      sendQueue = obj.items;
+    } else {
+      localStorage.removeItem('rq_sendq'); // 別人・別日の残骸は破棄
+    }
+  } catch (e) {}
+}
+function saveSendQueue() {
+  try { localStorage.setItem('rq_sendq', JSON.stringify({ name: me, date: localToday(), items: sendQueue })); } catch (e) {}
+}
+function enqueueAnswer(qid, choice, comment) {
+  sendQueue.push({ qid: qid, choice: choice, comment: comment || '' });
+  saveSendQueue();
+  pumpSendQueue();
+}
+function pumpSendQueue() {
+  if (sending || sendQueue.length === 0) return;
+  sending = true;
+  const item = sendQueue[0];
+  api({ action: 'answer', name: me, qid: item.qid, choice: item.choice, comment: item.comment })
+    .then(res => {
+      if (res && res.error) throw new Error(res.error);
+      sendQueue.shift();
+      saveSendQueue();
+      sending = false;
+      pumpSendQueue();
+    })
+    .catch(() => { sending = false; setTimeout(pumpSendQueue, 3000); });
+}
+
 function init() {
   if (!me) { showNamePicker(); return; }
   document.getElementById('viewMain').classList.remove('hidden');
   document.getElementById('userBadge').classList.remove('hidden');
   document.getElementById('userBadge').textContent = me + ' ▾';
+  loadSendQueue();   // 前回の未送信分があれば再送
+  pumpSendQueue();
   loadQuizHome();
 }
 
@@ -354,7 +404,7 @@ function submitFlag() {
     quiz.questions.filter(x => !x.done).length > 0 ? '次の問題へ' : '結果を見る';
   show('nextBtn');
 
-  api({ action: 'answer', name: me, qid: q.id, choice: 5, comment: comment }).catch(() => {});
+  enqueueAnswer(q.id, 5, comment);
 }
 
 function answer(choice, btnEl) {
@@ -381,17 +431,32 @@ function answer(choice, btnEl) {
     quiz.questions.filter(x => !x.done).length > 0 ? '次の問題へ' : '結果を見る';
   show('nextBtn');
 
-  // 記録はバックグラウンドで送信（画面はいっさい待たせない）
-  api({ action: 'answer', name: me, qid: q.id, choice: choice }).catch(() => {});
+  // 記録は送信キューへ（画面は待たせない。失敗時はリトライ＋完了時に照合）
+  enqueueAnswer(q.id, choice);
 }
 
 function nextQuestion() {
   qIndex = quiz.questions.findIndex(q => !q.done);
-  if (qIndex === -1) {
-    api({ action: 'status', name: me }).then(st => showDone(correctCount, quiz.questions.length, st.streak || 0));
-    return;
-  }
+  if (qIndex === -1) { finishAndSync(); return; }
   renderQuestion();
+}
+
+/** 完了時：全回答をまとめて照合送信し、欠落があればサーバ側で補完してから結果表示 */
+function finishAndSync() {
+  const items = quiz.questions.filter(q => q.done)
+    .map(q => q.id + ':' + q.done.choice).join(',');
+  api({ action: 'answerBatch', name: me, items: items })
+    .then(res => {
+      if (res && res.error) throw new Error(res.error);
+      sendQueue = []; saveSendQueue(); // バッチが全件保証したのでキューは破棄
+      showDone(correctCount, quiz.questions.length, res.streak || 0);
+    })
+    .catch(() => {
+      // バッチ失敗でもキューの再送が続くので、結果画面はそのまま表示
+      api({ action: 'status', name: me })
+        .then(st => showDone(correctCount, quiz.questions.length, st.streak || 0))
+        .catch(() => showDone(correctCount, quiz.questions.length, 0));
+    });
 }
 
 function showDone(correct, total, streak) {
