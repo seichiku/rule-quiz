@@ -240,19 +240,32 @@ function enqueueAnswer(qid, choice, comment) {
   saveSendQueue();
   pumpSendQueue();
 }
+// 先頭1件がずっと失敗すると後続の回答が全部送れなくなる（先頭固定リトライ）ため、
+//  ・サーバが {error} を返した＝リトライしても直らない → その1件は諦めて次へ進む
+//  ・通信エラー → 数回リトライし、それでもダメなら末尾へ回して後続を先に流す
+// いずれも取りこぼしは完了画面の answerBatch で拾い直す。
+const MAX_SEND_TRIES = 3;
 function pumpSendQueue() {
   if (sending || sendQueue.length === 0) return;
   sending = true;
   const item = sendQueue[0];
   api({ action: 'answer', name: me, qid: item.qid, choice: item.choice, comment: item.comment })
-    .then(res => {
-      if (res && res.error) throw new Error(res.error);
+    .then(() => {
       sendQueue.shift();
       saveSendQueue();
       sending = false;
       pumpSendQueue();
     })
-    .catch(() => { sending = false; setTimeout(pumpSendQueue, 3000); });
+    .catch(() => {
+      item.tries = (item.tries || 0) + 1;
+      if (item.tries >= MAX_SEND_TRIES && sendQueue.length > 1) {
+        item.tries = 0;
+        sendQueue.push(sendQueue.shift());   // 末尾へ回して後続を詰まらせない
+      }
+      saveSendQueue();
+      sending = false;
+      setTimeout(pumpSendQueue, 3000);
+    });
 }
 
 function init() {
