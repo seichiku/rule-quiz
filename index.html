@@ -322,15 +322,21 @@ function showTab(t) {
 function cap(s) { return s === 'fb' ? 'Fb' : s.charAt(0).toUpperCase() + s.slice(1); }
 
 // ===== クイズ =====
+let quizLoadError = null; // homeで出題を受け取れなかったときの理由（承認待ち等）
+
+// 2026-08-14改修：status＋出題を home 1回で受け取る（開始ボタンの待ち時間ゼロ化）
 function loadQuizHome() {
   show('quizLoading'); hide('quizHome'); hide('quizPlay'); hide('quizDone');
-  api({ action: 'status', name: me }).then(st => {
+  api({ action: 'home', name: me }).then(res => {
     hide('quizLoading');
-    if (st.error) { document.getElementById('quizLoading').textContent = st.error; show('quizLoading'); return; }
+    if (res.error) { document.getElementById('quizLoading').textContent = res.error; show('quizLoading'); return; }
+    const st = res.status;
     if (st.completed) {
       showDone(st.correctToday, st.total, st.streak);
       return;
     }
+    quiz = res.quiz;                       // 出題は受け取り済み。開始時の通信は不要
+    quizLoadError = res.quizError || null;
     show('quizHome');
     const pct = Math.round(st.doneToday / st.total * 100);
     document.getElementById('quizHomeMsg').textContent =
@@ -343,18 +349,25 @@ function loadQuizHome() {
 }
 
 function startQuiz() {
+  if (quiz && quiz.questions) { beginQuiz(); return; }   // homeで受け取り済み＝即開始
+  if (quizLoadError) { alert(quizLoadError); return; }    // 承認待ち等
+  // 予備：homeで出題が取れなかった場合のみ従来どおり取得
   const btn = document.getElementById('startBtn');
   btn.disabled = true; btn.textContent = '読み込み中…';
   api({ action: 'quiz', name: me }).then(res => {
     btn.disabled = false;
     if (res.error) { alert(res.error); return; }
     quiz = res;
-    correctCount = quiz.questions.filter(q => q.done && q.done.correct).length;
-    qIndex = quiz.questions.findIndex(q => !q.done);
-    if (qIndex === -1) { loadQuizHome(); return; }
-    hide('quizHome'); show('quizPlay');
-    renderQuestion();
+    beginQuiz();
   }).catch(() => { btn.disabled = false; alert('通信エラー'); });
+}
+
+function beginQuiz() {
+  correctCount = quiz.questions.filter(q => q.done && q.done.correct).length;
+  qIndex = quiz.questions.findIndex(q => !q.done);
+  if (qIndex === -1) { finishAndSync(); return; }
+  hide('quizHome'); show('quizPlay');
+  renderQuestion();
 }
 
 function renderQuestion() {
